@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p .",
-    "start": "node dist/server.js",
+    "start": "node --expose-gc --optimize-for-size --max-old-space-size=256 dist/server.js",
     "dev": "tsx watch src/server.ts"
   },
   "dependencies": {

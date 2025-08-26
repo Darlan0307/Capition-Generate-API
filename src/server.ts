@@ -12,7 +12,56 @@ app.use(cors());
 const UPLOAD_ROOT = path.resolve("uploads");
 if (!fs.existsSync(UPLOAD_ROOT)) fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
 
-const upload = multer({ dest: UPLOAD_ROOT });
+// Configuração do multer com validação de tipos E LIMITE DE TAMANHO
+const upload = multer({
+  dest: UPLOAD_ROOT,
+  fileFilter: (req, file, cb) => {
+    // Aceita áudio e vídeo
+    const allowedMimes = [
+      // Áudio
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/wav",
+      "audio/flac",
+      "audio/aac",
+      "audio/ogg",
+      "audio/m4a",
+      "audio/x-m4a",
+      // Vídeo
+      "video/mp4",
+      "video/avi",
+      "video/quicktime",
+      "video/x-msvideo",
+      "video/x-ms-wmv",
+      "video/webm",
+      "video/x-flv",
+      "video/x-matroska",
+    ];
+
+    const isAllowed =
+      allowedMimes.includes(file.mimetype) ||
+      file.originalname.match(
+        /\.(mp3|wav|flac|aac|ogg|m4a|mp4|avi|mov|mkv|wmv|webm|flv)$/i
+      );
+
+    if (isAllowed) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error(
+          "Formato de arquivo não suportado. Use áudio (MP3, WAV, FLAC, AAC, OGG, M4A) ou vídeo (MP4, AVI, MOV, MKV, WMV, WEBM, FLV)."
+        )
+      );
+    }
+  },
+  limits: {
+    fileSize: 50 * 1024 * 1024, // REDUZIDO: 50MB limite para plano gratuito
+  },
+});
+
+// Controle de concorrência - apenas 1 processamento por vez
+let isProcessing = false;
+const processingQueue: Array<() => void> = [];
 
 // Render exige bind em 0.0.0.0 e porta da env
 const PORT = Number(process.env.PORT || 4000);
@@ -37,7 +86,7 @@ for (const bin of POSSIBLE_WHISPER_BINS) {
   }
 }
 
-const WHISPER_MODEL = "/app/whisper.cpp/models/ggml-base.en.bin";
+const WHISPER_MODEL = "/app/whisper.cpp/models/ggml-tiny.en.bin";
 
 // Verifica se os arquivos existem no startup
 console.log("Verificando arquivos do Whisper...");
@@ -124,13 +173,49 @@ function runProc(
   });
 }
 
-app.get("/health", (_, res) => res.json({ ok: true }));
+app.get("/formats", (_, res) => {
+  res.json({
+    supported_formats: {
+      audio: ["MP3", "WAV", "FLAC", "AAC", "OGG", "M4A"],
+      video: ["MP4", "AVI", "MOV", "MKV", "WMV", "WEBM", "FLV"],
+      max_file_size: "50MB (plano gratuito)",
+      note: "Para vídeos, apenas o áudio será processado para transcrição",
+      model: "Whisper Tiny (otimizado para baixo consumo de RAM)",
+      concurrent_processing: false,
+    },
+  });
+});
 
-app.post("/upload", upload.single("video"), async (req, res) => {
+app.get("/health", (_, res) => {
+  const memUsage = process.memoryUsage();
+  res.json({
+    ok: true,
+    whisper_binary: WHISPER_BIN || "not found",
+    model_loaded: fs.existsSync(WHISPER_MODEL),
+    processing: isProcessing,
+    memory: {
+      rss: Math.round(memUsage.rss / 1024 / 1024) + "MB",
+      heap: Math.round(memUsage.heapUsed / 1024 / 1024) + "MB",
+      external: Math.round(memUsage.external / 1024 / 1024) + "MB",
+    },
+  });
+});
+
+app.post("/transcribe", upload.single("media"), async (req, res) => {
   if (!req.file)
-    return res.status(400).json({ error: "Nenhum arquivo enviado" });
+    return res.status(400).json({ error: "Nenhum arquivo de mídia enviado" });
 
-  console.log(req.file);
+  // Controle de concorrência para plano gratuito
+  if (isProcessing) {
+    return res.status(429).json({
+      error: "Servidor ocupado. Tente novamente em alguns minutos.",
+      message: "O plano gratuito permite apenas um processamento por vez.",
+    });
+  }
+
+  console.log(
+    `Arquivo recebido: ${req.file.originalname} (${req.file.mimetype})`
+  );
 
   // Verifica novamente se os arquivos existem
   if (!WHISPER_BIN) {
@@ -144,6 +229,8 @@ app.post("/upload", upload.single("video"), async (req, res) => {
       error: `Modelo do Whisper não encontrado em ${WHISPER_MODEL}`,
     });
   }
+
+  isProcessing = true; // Marca como ocupado
 
   // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
@@ -163,7 +250,7 @@ app.post("/upload", upload.single("video"), async (req, res) => {
   const chunkPattern = path.join(jobDir, "chunk_%03d.wav");
 
   try {
-    // 1) extrai áudio e segmenta em ~30s
+    // 1) extrai áudio e segmenta em ~15s (chunks menores para menos RAM)
     const segArgs = [
       "-y",
       "-i",
@@ -178,7 +265,7 @@ app.post("/upload", upload.single("video"), async (req, res) => {
       "-f",
       "segment",
       "-segment_time",
-      "30",
+      "15", // chunks menores para economizar RAM
       "-reset_timestamps",
       "1", // reseta timestamps para cada segmento
       chunkPattern,
@@ -203,24 +290,46 @@ app.post("/upload", upload.single("video"), async (req, res) => {
     console.log(`Processando ${files.length} chunks...`);
 
     // 3) processa cada chunk com whisper.cpp e envia parcial via SSE
-    for (const chunkPath of files) {
-      // Parâmetros ajustados para whisper-cli (novo formato)
+    for (let i = 0; i < files.length; i++) {
+      const chunkPath = files[i];
+
+      // Força garbage collection entre chunks para liberar memória
+      if (global.gc) {
+        global.gc();
+      }
+
+      // Parâmetros otimizados para baixa memória
       const args = [
         "--model",
         WHISPER_MODEL,
         "--file",
         chunkPath,
         "--output-txt", // gera arquivo .txt
-        "--print-colors", // para debug
         "--language",
         "en", // força inglês
         "--threads",
-        "4", // limita threads
+        "1", // REDUZIDO: apenas 1 thread para economizar RAM
         "--no-timestamps", // texto limpo sem timestamps
+        "--best-of",
+        "1", // NOVO: reduz tentativas para economizar RAM
+        "--beam-size",
+        "1", // NOVO: beam search mínimo
       ];
 
       try {
-        console.log(`Processando chunk: ${path.basename(chunkPath)}`);
+        console.log(
+          `Processando chunk ${i + 1}/${files.length}: ${path.basename(
+            chunkPath
+          )}`
+        );
+
+        // Monitora uso de memória
+        const memUsage = process.memoryUsage();
+        console.log(
+          `Memória: RSS=${Math.round(
+            memUsage.rss / 1024 / 1024
+          )}MB, Heap=${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`
+        );
 
         // Verifica se o arquivo de áudio existe e tem conteúdo
         const stats = fs.statSync(chunkPath);
@@ -231,14 +340,17 @@ app.post("/upload", upload.single("video"), async (req, res) => {
           continue;
         }
 
-        const tr = await runProc(WHISPER_BIN, args);
+        // Processa com timeout para evitar travamento
+        const tr = await Promise.race([
+          runProc(WHISPER_BIN, args),
+          new Promise<any>(
+            (_, reject) => setTimeout(() => reject(new Error("Timeout")), 60000) // 60s timeout
+          ),
+        ]);
 
         console.log(`Código de saída: ${tr.code}`);
-        console.log(`Stdout: "${tr.stdout}"`);
-        console.log(`Stderr: "${tr.stderr}"`);
 
         if (tr.code !== 0) {
-          // manda erro do chunk, mas continua o fluxo
           console.error(
             `Erro no chunk ${path.basename(chunkPath)}:`,
             tr.stderr
@@ -268,10 +380,14 @@ app.post("/upload", upload.single("video"), async (req, res) => {
           }
 
           console.log(`Chunk processado: ${path.basename(chunkPath)}`);
-          console.log(`Texto extraído: "${text}"`);
 
           if (text) {
-            res.write(`data: ${JSON.stringify({ text })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({
+                text,
+                progress: Math.round(((i + 1) / files.length) * 100),
+              })}\n\n`
+            );
           } else {
             console.warn(
               `Nenhum texto extraído do chunk: ${path.basename(chunkPath)}`
@@ -290,12 +406,12 @@ app.post("/upload", upload.single("video"), async (req, res) => {
             }`,
           })}\n\n`
         );
+      } finally {
+        // Remove chunk imediatamente após processamento
+        try {
+          fs.unlinkSync(chunkPath);
+        } catch {}
       }
-
-      // apaga chunk para economizar espaço
-      try {
-        fs.unlinkSync(chunkPath);
-      } catch {}
     }
 
     // 4) fim do stream
@@ -314,6 +430,8 @@ app.post("/upload", upload.single("video"), async (req, res) => {
     res.end();
   } finally {
     clearInterval(keepAlive);
+    isProcessing = false; // Libera o processamento
+
     // limpeza
     try {
       fs.unlinkSync(inputPath);
@@ -322,6 +440,11 @@ app.post("/upload", upload.single("video"), async (req, res) => {
       // remove pasta do job
       fs.rmSync(jobDir, { recursive: true, force: true });
     } catch {}
+
+    // Força garbage collection final
+    if (global.gc) {
+      global.gc();
+    }
   }
 });
 

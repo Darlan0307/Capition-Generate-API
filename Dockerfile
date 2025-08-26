@@ -26,8 +26,8 @@ RUN head -20 Makefile
 # Compila usando make (comando padrão)
 RUN make
 
-# Baixa o modelo necessário
-RUN bash ./models/download-ggml-model.sh base.en
+# Baixa o modelo necessário - MUDANÇA: usar tiny em vez de base para economizar RAM
+RUN bash ./models/download-ggml-model.sh tiny.en
 
 # Verifica quais executáveis foram criados
 RUN echo "=== Executáveis criados ===" && \
@@ -53,7 +53,7 @@ COPY --from=build /app/whisper.cpp /app/whisper.cpp
 RUN echo "=== Verificando executáveis após cópia ===" && \
     find /app/whisper.cpp/ -name "*whisper*" -o -name "main" -type f -executable | sort && \
     echo "=== Verificando modelo ===" && \
-    ls -la /app/whisper.cpp/models/ggml-base.en.bin
+    ls -la /app/whisper.cpp/models/ggml-tiny.en.bin
 
 # Copia package.json e instala deps (inclui dev deps p/ build)
 COPY package*.json ./
@@ -68,4 +68,5 @@ RUN npm run build
 # Expõe porta
 EXPOSE 4000
 
-CMD ["npm", "start"]
+# Habilita garbage collection manual
+CMD ["node", "--expose-gc", "dist/server.js"]
