@@ -1,0 +1,4 @@
+- atualizar as dependências
+- adicionar login com o google
+- adicionar middlewares de auth e error handling
+- adicionar pagamento com o stripe
