@@ -2,7 +2,7 @@ import { Router } from "express";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { upload, UPLOAD_ROOT } from "../lib";
+import { prismaDB, upload, UPLOAD_ROOT } from "../lib";
 import { runProc } from "../utils";
 import { WHISPER_BIN, WHISPER_MODEL } from "../configs";
 
@@ -31,7 +31,7 @@ routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
     });
   }
 
-  console.log(`Arquivo recebido: ${req.file}`);
+  console.log(`Arquivo recebido: ${JSON.stringify(req.file, null, 2)}`);
 
   isProcessing = true;
 

@@ -62,6 +62,9 @@ COPY . .
 # Compila TypeScript (gera dist/)
 RUN npm run build
 
+# Gerando cliente prisma
+RUN npx prisma generate
+
 # Expõe porta
 EXPOSE 4000
 
