@@ -2,3 +2,6 @@
 - adicionar middlewares de auth e error handling
 - adicionar pagamento com o stripe
 - adicionar rate limiting
+- deixar mensagens de error para o usuario em inglês
+
+

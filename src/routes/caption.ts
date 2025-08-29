@@ -2,8 +2,8 @@ import { Router } from "express";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { prismaDB, upload, UPLOAD_ROOT } from "../lib";
-import { runProc } from "../utils";
+import { upload, UPLOAD_ROOT } from "../lib";
+import { checkFileType, isFileTooLarge, runProc } from "../utils";
 import { WHISPER_BIN, WHISPER_MODEL } from "../configs";
 
 export const routerCaption = Router();
@@ -25,13 +25,26 @@ routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
       .status(400)
       .json({ errorMessage: "Nenhum arquivo de mídia enviado" });
 
+  console.log(`User: ${req.user}`);
+
+  if (!checkFileType(req.file, false)) {
+    return res
+      .status(400)
+      .json({ errorMessage: "Formato de arquivo inválido" });
+  }
+
+  if (isFileTooLarge(req.file)) {
+    return res.status(400).json({
+      errorMessage:
+        "O arquivo excede o limite de tamanho permitido no plano gratuito.",
+    });
+  }
+
   if (isProcessing) {
     return res.status(429).json({
       errorMessage: "O plano gratuito permite apenas um processamento por vez.",
     });
   }
-
-  console.log(`Arquivo recebido: ${JSON.stringify(req.file, null, 2)}`);
 
   isProcessing = true;
 
