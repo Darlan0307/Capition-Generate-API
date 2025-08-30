@@ -60,7 +60,7 @@ export default class HttpServer {
   private loadRoutes(): void {
     this.app.get("/", (_, res) => {
       res.json({
-        message: "API Caption - Gerador de legendas",
+        message: "API - Caption Generator",
       });
     });
 

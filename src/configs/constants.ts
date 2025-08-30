@@ -5,9 +5,9 @@ export const WHISPER_MODEL = process.env.WHISPER_MODEL_PATH || "";
 export const WHISPER_BIN = process.env.WHISPER_BIN || "";
 
 if (!fs.existsSync(WHISPER_MODEL)) {
-  throw new Error(`ERRO: Modelo não encontrado em ${WHISPER_MODEL}`);
+  throw new Error(`ERROR: Model not found in ${WHISPER_MODEL}`);
 }
 
 if (!fs.existsSync(WHISPER_BIN)) {
-  throw new Error(`ERRO: Binário não encontrado em ${WHISPER_BIN}`);
+  throw new Error(`ERROR: Binary not found in ${WHISPER_BIN}`);
 }

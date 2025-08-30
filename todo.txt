@@ -1,5 +1,4 @@
-- adicionar login com o google
-- adicionar middlewares de auth e error handling
+- error handling
 - adicionar pagamento com o stripe
 - adicionar rate limiting
 - deixar mensagens de error para o usuario em inglês

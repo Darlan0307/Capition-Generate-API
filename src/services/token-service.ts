@@ -8,7 +8,7 @@ export class TokenService {
   constructor(private secret: string) {
     if (!secret || secret.trim() === "") {
       throw new Error(
-        "Erro na configuração da aplicação: JWT_SECRET não definido"
+        "Application configuration error: JWT_SECRET not defined"
       );
     }
 
@@ -30,7 +30,7 @@ export class TokenService {
 
       return decoded;
     } catch (error) {
-      console.error("Erro ao verificar token:", error);
+      console.error("Error verifying token:", error);
       return null;
     }
   }

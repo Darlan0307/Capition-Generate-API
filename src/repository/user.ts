@@ -16,7 +16,7 @@ export class PrismaUserRepository {
 
       return user;
     } catch (error) {
-      throw new Error("Erro ao buscar o usuário" + JSON.stringify(error));
+      throw new Error("Error retrieving user:" + JSON.stringify(error));
     }
   }
 }

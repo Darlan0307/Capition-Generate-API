@@ -10,13 +10,13 @@ export const handleMulterErrors = (
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
       res.status(400).json({
-        errorMessage: "O arquivo excede o limite de tamanho permitido.",
+        errorMessage: "The file exceeds the permitted size limit.",
       });
       return;
     }
     res.status(400).json({ errorMessage: err.message });
     return;
   }
-  res.status(500).json({ errorMessage: "Erro interno no sistema." });
+  res.status(500).json({ errorMessage: "Internal system error." });
   return;
 };

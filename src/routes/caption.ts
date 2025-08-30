@@ -21,43 +21,36 @@ routerCaption.get("/formats", (_, res) => {
 
 routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
   if (!req.file)
-    return res
-      .status(400)
-      .json({ errorMessage: "Nenhum arquivo de mídia enviado" });
+    return res.status(400).json({ errorMessage: "No media files submitted" });
 
   console.log(`User: ${req.user}`);
 
-  if (!checkFileType(req.file, false)) {
-    return res
-      .status(400)
-      .json({ errorMessage: "Formato de arquivo inválido" });
+  if (!checkFileType(req.file, req?.user?.isPremium ?? false)) {
+    return res.status(400).json({ errorMessage: "Invalid file format" });
   }
 
-  if (isFileTooLarge(req.file)) {
+  if (isFileTooLarge(req.file) && !req?.user?.isPremium) {
     return res.status(400).json({
-      errorMessage:
-        "O arquivo excede o limite de tamanho permitido no plano gratuito.",
+      errorMessage: "The file exceeds the size limit allowed in the free plan.",
     });
   }
 
-  if (isProcessing) {
+  if (isProcessing && !req?.user?.isPremium) {
     return res.status(429).json({
-      errorMessage: "O plano gratuito permite apenas um processamento por vez.",
+      errorMessage: "The free plan only allows one process at a time.",
     });
   }
 
   isProcessing = true;
 
-  // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
   const keepAlive = setInterval(() => {
-    res.write(": ping\n\n"); // comentário SSE para manter a conexão viva
+    res.write(": ping\n\n");
   }, 15000);
 
-  // cada request tem uma pasta própria p/ evitar colisões em concorrência
   const jobId = crypto.randomUUID();
   const jobDir = path.join(UPLOAD_ROOT, jobId);
   fs.mkdirSync(jobDir, { recursive: true });
@@ -66,24 +59,23 @@ routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
   const chunkPattern = path.join(jobDir, "chunk_%03d.wav");
 
   try {
-    // 1) extrai áudio e segmenta em ~15s (chunks menores para menos RAM)
     const segArgs = [
       "-y",
       "-i",
       inputPath,
-      "-vn", // sem vídeo
+      "-vn",
       "-ac",
-      "1", // mono
+      "1",
       "-ar",
-      "16000", // 16kHz sample rate
+      "16000",
       "-acodec",
-      "pcm_s16le", // codec PCM explícito
+      "pcm_s16le",
       "-f",
       "segment",
       "-segment_time",
-      "15", // chunks menores para economizar RAM
+      "15",
       "-reset_timestamps",
-      "1", // reseta timestamps para cada segmento
+      "1",
       chunkPattern,
     ];
     const seg = await runProc("ffmpeg", segArgs);
@@ -92,7 +84,6 @@ routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
       throw new Error(`ffmpeg segment error: ${seg.stderr}`);
     }
 
-    // 2) lista chunks
     const files = fs
       .readdirSync(jobDir)
       .filter((f) => f.startsWith("chunk_") && f.endsWith(".wav"))
@@ -100,75 +91,65 @@ routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
       .sort();
 
     if (files.length === 0) {
-      throw new Error("Nenhum chunk gerado");
+      throw new Error("No chunk generated");
     }
 
-    // 3) processa cada chunk com whisper.cpp e envia parcial via SSE
     for (let i = 0; i < files.length; i++) {
       const chunkPath = files[i];
 
-      // Força garbage collection entre chunks para liberar memória
       if (global.gc) {
         global.gc();
       }
 
-      // Parâmetros otimizados para baixa memória
       const args = [
         "--model",
         WHISPER_MODEL,
         "--file",
         chunkPath,
-        "--output-txt", // gera arquivo .txt
+        "--output-txt",
         "--language",
-        "en", // força inglês
+        "en",
         "--threads",
-        "1", // REDUZIDO: apenas 1 thread para economizar RAM
-        "--no-timestamps", // texto limpo sem timestamps
+        "1",
+        "--no-timestamps",
         "--best-of",
-        "1", // NOVO: reduz tentativas para economizar RAM
+        "1",
         "--beam-size",
-        "1", // NOVO: beam search mínimo
+        "1",
       ];
 
       try {
-        // Verifica se o arquivo de áudio existe e tem conteúdo
         const stats = fs.statSync(chunkPath);
 
         if (stats.size === 0) {
           continue;
         }
 
-        // Processa com timeout para evitar travamento
         const tr = await Promise.race([
           runProc(WHISPER_BIN, args),
-          new Promise<any>(
-            (_, reject) => setTimeout(() => reject(new Error("Timeout")), 60000) // 60s timeout
+          new Promise<any>((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout")), 60000)
           ),
         ]);
 
         if (tr.code !== 0) {
-          console.error(
-            `Erro no chunk ${path.basename(chunkPath)}:`,
-            tr.stderr
-          );
+          console.error(`Chunk error ${path.basename(chunkPath)}:`, tr.stderr);
           res.write(
             `data: ${JSON.stringify({
-              error: `Erro no chunk: ${path.basename(chunkPath)} - ${
-                tr.stderr || "Erro desconhecido"
+              error: `Chunk error: ${path.basename(chunkPath)} - ${
+                tr.stderr || "Unknown error"
               }`,
             })}\n\n`
           );
         } else {
-          // Para whisper-cli, a transcrição pode vir no stdout ou ser salva em arquivo .txt
           let text = tr.stdout.trim();
 
-          // Se não há texto no stdout, tenta ler arquivo .txt gerado
           if (!text) {
             const txtFile = chunkPath.replace(".wav", ".txt");
             try {
               if (fs.existsSync(txtFile)) {
                 text = fs.readFileSync(txtFile, "utf8").trim();
-                fs.unlinkSync(txtFile); // limpa arquivo temporário
+                fs.unlinkSync(txtFile);
               }
             } catch (e) {
               console.warn(`Erro ao ler arquivo txt: ${e}`);
@@ -184,39 +165,37 @@ routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
             );
           } else {
             console.warn(
-              `Nenhum texto extraído do chunk: ${path.basename(chunkPath)}`
+              `No text extracted from the chunk: ${path.basename(chunkPath)}`
             );
           }
         }
       } catch (chunkError: any) {
         console.error(
-          `Erro ao processar chunk ${path.basename(chunkPath)}:`,
+          `Error processing chunk ${path.basename(chunkPath)}:`,
           chunkError
         );
         res.write(
           `data: ${JSON.stringify({
-            error: `Erro no chunk: ${path.basename(chunkPath)} - ${
+            error: `Chunk error: ${path.basename(chunkPath)} - ${
               chunkError.message
             }`,
           })}\n\n`
         );
       } finally {
-        // Remove chunk imediatamente após processamento
         try {
           fs.unlinkSync(chunkPath);
         } catch {}
       }
     }
 
-    // 4) fim do stream
     res.write("event: end\n");
     res.write("data: FIM\n\n");
     res.end();
   } catch (e: any) {
-    console.error("Erro no processamento:", e);
+    console.error("Processing error:", e);
     res.write(
       `data: ${JSON.stringify({
-        error: e?.message || "Falha no processamento",
+        error: e?.message || "Processing error",
       })}\n\n`
     );
     res.write("event: end\n");
@@ -226,16 +205,13 @@ routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
     clearInterval(keepAlive);
     isProcessing = false;
 
-    // limpeza
     try {
       fs.unlinkSync(inputPath);
     } catch {}
     try {
-      // remove pasta do job
       fs.rmSync(jobDir, { recursive: true, force: true });
     } catch {}
 
-    // Força garbage collection final
     if (global.gc) {
       global.gc();
     }

@@ -25,14 +25,14 @@ export function createAuthMiddleware(): RequestHandler {
       const token = req.cookies["auth-token"];
 
       if (!token) {
-        res.status(403).json({ error: "Token não encontrado" });
+        res.status(403).json({ errorMessage: "You are not authenticated" });
         return;
       }
 
       const decoded = tokenService.verifyToken(token);
 
       if (!decoded) {
-        res.status(403).json({ error: "Token inválido" });
+        res.status(403).json({ errorMessage: "Invalid token" });
         return;
       }
 
@@ -43,8 +43,7 @@ export function createAuthMiddleware(): RequestHandler {
       next();
     } catch (error) {
       res.status(403).json({
-        errorMessage:
-          "Erro ao verificar token" + JSON.stringify(error, null, 2),
+        errorMessage: "Error verifying token" + JSON.stringify(error, null, 2),
       });
       return;
     }
