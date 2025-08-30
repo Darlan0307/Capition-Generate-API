@@ -10,20 +10,9 @@ export const routerCaption = Router();
 
 export let isProcessing = false;
 
-routerCaption.get("/formats", (_, res) => {
-  res.json({
-    supported_formats: {
-      audio: ["MP3", "WAV", "FLAC", "AAC", "OGG", "M4A"],
-      video: ["MP4", "AVI", "MOV", "MKV", "WMV", "WEBM", "FLV"],
-    },
-  });
-});
-
 routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
   if (!req.file)
     return res.status(400).json({ errorMessage: "No media files submitted" });
-
-  console.log(`User: ${req.user}`);
 
   if (!checkFileType(req.file, req?.user?.isPremium ?? false)) {
     return res.status(400).json({ errorMessage: "Invalid file format" });

@@ -1,7 +1,12 @@
 import express, { Express } from "express";
 import cors from "cors";
 import { prismaDB } from "./lib";
-import { createAuthMiddleware, handleMulterErrors } from "./middlewares";
+import {
+  apiLimiter,
+  createAuthMiddleware,
+  errorHandler,
+  handleMulterErrors,
+} from "./middlewares";
 import { WHISPER_MODEL } from "./configs";
 import { isProcessing, routerAuth, routerCaption } from "./routes";
 import fs from "fs";
@@ -55,6 +60,7 @@ export default class HttpServer {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(createAuthMiddleware());
+    this.app.use(apiLimiter);
   }
 
   private loadRoutes(): void {
@@ -81,5 +87,6 @@ export default class HttpServer {
     this.app.use(routerAuth);
     this.app.use(routerCaption);
     this.app.use(handleMulterErrors);
+    this.app.use(errorHandler);
   }
 }

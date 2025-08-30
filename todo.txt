@@ -1,6 +1,5 @@
-- error handling
+[X] error handling
+[X] adicionar rate limiting
 - adicionar pagamento com o stripe
-- adicionar rate limiting
-- deixar mensagens de error para o usuario em inglês
 
 
