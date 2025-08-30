@@ -31,7 +31,7 @@ export default class HttpServer {
   private loadMiddlewares(): void {
     this.app.use(
       cors({
-        origin: process.env.FRONTEND_URL || "http://localhost:5000",
+        origin: process.env.FRONTEND_URL || "http://localhost:8080",
         credentials: true,
       })
     );

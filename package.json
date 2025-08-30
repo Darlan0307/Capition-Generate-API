@@ -4,7 +4,7 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc -p .",
-    "start": "NODE_ENV=production node --expose-gc --optimize-for-size --max-old-space-size=256 dist/main.js",
+    "start": "node --expose-gc --optimize-for-size --max-old-space-size=256 dist/main.js",
     "dev": "tsx watch src/main.ts"
   },
   "dependencies": {
