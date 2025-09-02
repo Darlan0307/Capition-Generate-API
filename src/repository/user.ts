@@ -19,4 +19,27 @@ export class PrismaUserRepository {
       throw new Error("Error retrieving user:" + JSON.stringify(error));
     }
   }
+
+  async incrementTranscriptionsCompleted(userId: string): Promise<void> {
+    try {
+      const userExists = await this.get(userId);
+
+      if (!userExists) return;
+
+      await prismaDB.user.update({
+        where: {
+          id: userId,
+        },
+        data: {
+          qtdTranscriptionsCompleted: {
+            increment: 1,
+          },
+        },
+      });
+    } catch (error) {
+      throw new Error(
+        "Error incrementing transcriptions completed:" + JSON.stringify(error)
+      );
+    }
+  }
 }

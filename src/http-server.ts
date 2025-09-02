@@ -8,11 +8,18 @@ import {
   handleMulterErrors,
 } from "./middlewares";
 import { WHISPER_MODEL } from "./configs";
-import { isProcessing, routerAuth, routerCaption } from "./routes";
+import {
+  isProcessing,
+  routerAuth,
+  routerCaption,
+  routerCheckout,
+  routerConfigs,
+} from "./routes";
 import fs from "fs";
 import session from "express-session";
 import cookieParser from "cookie-parser";
 import passportConfig from "./lib/passport";
+import { routerWebhook } from "./routes/webhook";
 
 export default class HttpServer {
   private app: Express;
@@ -57,6 +64,7 @@ export default class HttpServer {
     this.app.use(passportConfig.initialize());
     this.app.use(passportConfig.session());
 
+    this.app.use(routerWebhook);
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(createAuthMiddleware());
@@ -84,8 +92,10 @@ export default class HttpServer {
       });
     });
 
+    this.app.use(routerConfigs);
     this.app.use(routerAuth);
     this.app.use(routerCaption);
+    this.app.use(routerCheckout);
     this.app.use(handleMulterErrors);
     this.app.use(errorHandler);
   }

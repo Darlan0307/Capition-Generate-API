@@ -12,6 +12,7 @@ export type User = {
   stripeSubscriptionId: string | null;
   stripeSubscriptionStatus: string | null;
   currentPeriodEndAt: Date | null;
+  qtdTranscriptionsCompleted: number;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;

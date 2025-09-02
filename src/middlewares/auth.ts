@@ -4,7 +4,13 @@ import { PrismaUserRepository } from "../repository";
 import { User } from "../@types/user";
 
 const PUBLIC_ROUTES = {
-  exact: ["/", "/health", "/formats", "/auth/google", "/auth/google/callback"],
+  exact: [
+    "/",
+    "/health",
+    "/max-transcriptions-free",
+    "/auth/google",
+    "/auth/google/callback",
+  ],
 };
 
 export function createAuthMiddleware(): RequestHandler {

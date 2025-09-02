@@ -4,29 +4,45 @@ import path from "path";
 import crypto from "crypto";
 import { upload, UPLOAD_ROOT } from "../lib";
 import { checkFileType, isFileTooLarge, runProc } from "../utils";
-import { WHISPER_BIN, WHISPER_MODEL } from "../configs";
+import {
+  MAX_TRANSCRIPTIONS_FREE,
+  WHISPER_BIN,
+  WHISPER_MODEL,
+} from "../configs";
+import { PrismaUserRepository } from "../repository";
 
 export const routerCaption = Router();
 
 export let isProcessing = false;
 
+const userRepo = new PrismaUserRepository();
+
 routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
+  const isPremium = req?.user?.isPremium ?? false;
+
   if (!req.file)
     return res.status(400).json({ errorMessage: "No media files submitted" });
 
-  if (!checkFileType(req.file, req?.user?.isPremium ?? false)) {
+  if (!checkFileType(req.file, isPremium)) {
     return res.status(400).json({ errorMessage: "Invalid file format" });
   }
 
-  if (isFileTooLarge(req.file) && !req?.user?.isPremium) {
+  if (isFileTooLarge(req.file) && !isPremium) {
     return res.status(400).json({
       errorMessage: "The file exceeds the size limit allowed in the free plan.",
     });
   }
 
-  if (isProcessing && !req?.user?.isPremium) {
+  if (isProcessing && !isPremium) {
     return res.status(429).json({
       errorMessage: "The free plan only allows one process at a time.",
+    });
+  }
+  const qtdTranscriptions = req?.user?.qtdTranscriptionsCompleted ?? 0;
+
+  if (!isPremium && qtdTranscriptions >= MAX_TRANSCRIPTIONS_FREE) {
+    return res.status(429).json({
+      errorMessage: "You have reached the maximum number of transcriptions.",
     });
   }
 
@@ -193,7 +209,6 @@ routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
   } finally {
     clearInterval(keepAlive);
     isProcessing = false;
-
     try {
       fs.unlinkSync(inputPath);
     } catch {}
@@ -204,5 +219,6 @@ routerCaption.post("/transcribe", upload.single("media"), async (req, res) => {
     if (global.gc) {
       global.gc();
     }
+    await userRepo.incrementTranscriptionsCompleted(req?.user?.id ?? "");
   }
 });

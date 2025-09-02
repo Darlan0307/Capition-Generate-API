@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -19,11 +19,13 @@ model User {
   bio     String? @db.VarChar(500)
   website String? @db.VarChar(200)
 
-  isPremium Boolean @default(false)
-  stripeCustomerId String? @db.VarChar(50)
-  stripeSubscriptionId String? @db.VarChar(50)
-  stripeSubscriptionStatus String? @db.VarChar(50)
-  currentPeriodEndAt DateTime? @db.Timestamptz(6)
+  isPremium                Boolean   @default(false)
+  stripeCustomerId         String?   @db.VarChar(50)
+  stripeSubscriptionId     String?   @db.VarChar(50)
+  stripeSubscriptionStatus String?   @db.VarChar(50)
+  currentPeriodEndAt       DateTime? @db.Timestamptz(6)
+
+  qtdTranscriptionsCompleted Int @default(0)
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
