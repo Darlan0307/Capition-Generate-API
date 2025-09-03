@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { prismaDB } from "./prisma";
+import { PrismaOrTransaction, withIdempotency } from "./stripe-idempotency";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing STRIPE_SECRET_KEY");
@@ -63,100 +64,109 @@ export const generateCheckout = async (userId: string, email: string) => {
 };
 
 export const handleCheckoutSessionCompleted = async (event: {
+  id: string;
+  type: Stripe.Event.Type;
   data: { object: Stripe.Checkout.Session };
 }) => {
-  const idUser = event.data.object.client_reference_id as string;
-  const stripeSubscriptionId = event.data.object.subscription as string;
-  const stripeCustomerId = event.data.object.customer as string;
-  const checkoutStatus = event.data.object.payment_status;
+  await prismaDB.$transaction(async (tx: PrismaOrTransaction) => {
+    await withIdempotency(tx, event, async () => {
+      const idUser = event.data.object.client_reference_id as string;
+      const stripeSubscriptionId = event.data.object.subscription as string;
+      const stripeCustomerId = event.data.object.customer as string;
+      const checkoutStatus = event.data.object.payment_status;
 
-  if (checkoutStatus !== "paid") return;
+      if (checkoutStatus !== "paid") return;
 
-  if (!idUser || !stripeSubscriptionId || !stripeCustomerId) {
-    throw new Error(
-      "idUser, stripeSubscriptionId, stripeCustomerId is required"
-    );
-  }
+      if (!idUser || !stripeSubscriptionId || !stripeCustomerId) {
+        throw new Error(
+          "idUser, stripeSubscriptionId, stripeCustomerId is required"
+        );
+      }
 
-  const userExist = await prismaDB.user.findUnique({ where: { id: idUser } });
+      const userExist = await tx.user.findUnique({ where: { id: idUser } });
 
-  if (!userExist) {
-    throw new Error("user not found");
-  }
+      if (!userExist) {
+        throw new Error("user not found");
+      }
 
-  const subscription = await stripe.subscriptions.retrieve(
-    stripeSubscriptionId
-  );
+      const subscription = await stripe.subscriptions.retrieve(
+        stripeSubscriptionId
+      );
 
-  await prismaDB.user.update({
-    where: {
-      id: userExist.id,
-    },
-    data: {
-      stripeCustomerId,
-      stripeSubscriptionId,
-      stripeSubscriptionStatus: subscription.status,
-      isPremium:
-        subscription.status === "active" || subscription.status === "trialing",
-    },
+      await tx.user.update({
+        where: {
+          id: userExist.id,
+        },
+        data: {
+          stripeCustomerId,
+          stripeSubscriptionId,
+          stripeSubscriptionStatus: subscription.status,
+          isPremium: computeIsPremium(subscription.status),
+        },
+      });
+    });
   });
 };
 
 export const handleSubscriptionSessionCompleted = async (event: {
+  id: string;
+  type: Stripe.Event.Type;
   data: { object: Stripe.Subscription };
 }) => {
-  const subscriptionStatus = event.data.object.status;
-  const stripeCustomerId = event.data.object.customer as string;
-  const userId = event.data.object.metadata?.userId;
+  await prismaDB.$transaction(async (tx: PrismaOrTransaction) => {
+    await withIdempotency(tx, event, async () => {
+      const subscriptionStatus = event.data.object.status;
+      const stripeCustomerId = event.data.object.customer as string;
+      const userId = event.data.object.metadata?.userId;
 
-  let userExist = null;
+      let user = userId
+        ? await tx.user.findUnique({ where: { id: userId } })
+        : await tx.user.findFirst({ where: { stripeCustomerId } });
 
-  if (userId) {
-    userExist = await prismaDB.user.findUnique({
-      where: { id: userId },
+      if (!user) return;
+
+      await tx.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          stripeSubscriptionStatus: subscriptionStatus,
+        },
+      });
     });
-  } else {
-    userExist = await prismaDB.user.findFirst({
-      where: { stripeCustomerId },
-    });
-  }
-
-  if (!userExist) return;
-
-  await prismaDB.user.update({
-    where: {
-      id: userExist.id,
-    },
-    data: {
-      stripeSubscriptionStatus: subscriptionStatus,
-    },
   });
 };
 
 export const handleCancelPlan = async (event: {
+  id: string;
+  type: Stripe.Event.Type;
   data: { object: Stripe.Subscription };
 }) => {
-  const stripeCustomerId = event.data.object.customer as string;
+  await prismaDB.$transaction(async (tx: PrismaOrTransaction) => {
+    await withIdempotency(tx, event, async () => {
+      const stripeCustomerId = event.data.object.customer as string;
 
-  const userExist = await prismaDB.user.findFirst({
-    where: {
-      stripeCustomerId,
-    },
-  });
+      const userExist = await tx.user.findFirst({
+        where: {
+          stripeCustomerId,
+        },
+      });
 
-  if (!userExist) return;
+      if (!userExist) return;
 
-  await prismaDB.user.update({
-    where: {
-      id: userExist.id,
-    },
-    data: {
-      stripeCustomerId: null,
-      stripeSubscriptionId: null,
-      stripeSubscriptionStatus: null,
-      isPremium: false,
-      currentPeriodEndAt: null,
-    },
+      await tx.user.update({
+        where: {
+          id: userExist.id,
+        },
+        data: {
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          stripeSubscriptionStatus: "canceled",
+          isPremium: false,
+          currentPeriodEndAt: null,
+        },
+      });
+    });
   });
 };
 
@@ -174,7 +184,7 @@ export const handleCancelSubscription = async (userId: string) => {
     data: {
       stripeCustomerId: null,
       stripeSubscriptionId: null,
-      stripeSubscriptionStatus: null,
+      stripeSubscriptionStatus: "canceled",
       isPremium: false,
       currentPeriodEndAt: null,
     },
@@ -204,6 +214,10 @@ export const getPaymentHistory = async (customerId: string) => {
   });
   return payments.data;
 };
+
+function computeIsPremium(status?: Stripe.Subscription.Status | null) {
+  return status === "active" || status === "trialing";
+}
 
 //TODO Tratar idempotência com o prisma, mas poderia usar o REDIS também
 // const eventExist = await prismaDB.stripeEvent.findUnique({

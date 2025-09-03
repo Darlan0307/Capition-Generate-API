@@ -33,3 +33,11 @@ model User {
 
   @@map("users")
 }
+
+model StripeEvent {
+  id        String   @id @db.VarChar(255)
+  type      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("stripe_events")
+}

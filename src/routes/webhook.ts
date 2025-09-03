@@ -31,22 +31,29 @@ routerWebhook.post(
       return;
     }
 
-    switch (event.type) {
-      case "checkout.session.completed":
-        await handleCheckoutSessionCompleted(event);
-        break;
-      case "customer.subscription.created":
-      case "customer.subscription.updated":
-        await handleSubscriptionSessionCompleted(event);
-        break;
-      case "customer.subscription.deleted":
-        await handleCancelPlan(event);
-        break;
+    try {
+      switch (event.type) {
+        case "checkout.session.completed":
+          await handleCheckoutSessionCompleted(event);
+          break;
 
-      default:
-        console.log(`Unhandled event type ${event.type}`);
+        case "customer.subscription.created":
+        case "customer.subscription.updated":
+          await handleSubscriptionSessionCompleted(event);
+          break;
+
+        case "customer.subscription.deleted":
+          await handleCancelPlan(event);
+          break;
+
+        default:
+          console.log(`Unhandled event type ${event.type}`);
+      }
+
+      res.status(200).send("ok");
+    } catch (error) {
+      console.error("Webhook handler error:", error);
+      return res.status(200).send("ok");
     }
-
-    res.send();
   }
 );
