@@ -64,9 +64,9 @@ export default class HttpServer {
     );
     this.app.use(passportConfig.initialize());
     this.app.use(passportConfig.session());
+    this.app.use(routerWebhook);
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
-    this.app.use(routerWebhook);
     this.app.use(createAuthMiddleware());
     this.app.use(apiLimiter);
   }
