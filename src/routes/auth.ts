@@ -8,6 +8,18 @@ const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
 
 const tokenService = new TokenService(process.env.JWT_SECRET!);
 
+function getCookieOptions() {
+  const isProd = process.env.NODE_ENV === "production";
+
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? ("none" as const) : ("lax" as const),
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+    path: "/",
+  };
+}
+
 routerAuth.get(
   "/auth/google",
   passportConfig.authenticate("google", { scope: ["profile", "email"] })
@@ -22,13 +34,7 @@ routerAuth.get(
     try {
       const token = tokenService.generateAccessToken(req?.user?.id ?? "");
 
-      res.cookie("auth-token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax", // Proteção CSRF
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
+      res.cookie("auth-token", token, getCookieOptions());
 
       res.redirect(`${frontendUrl}/`);
     } catch (error) {
@@ -39,12 +45,7 @@ routerAuth.get(
 );
 
 routerAuth.get("/auth/logout", (req, res) => {
-  res.clearCookie("auth-token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-  });
+  res.clearCookie("auth-token", getCookieOptions());
 
   req.logout((err) => {
     if (err) {

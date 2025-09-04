@@ -29,14 +29,14 @@ export function createAuthMiddleware(): RequestHandler {
 
     try {
       const token = req.cookies["auth-token"];
-
+      console.log("Token:", token);
       if (!token) {
         res.status(403).json({ errorMessage: "You are not authenticated" });
         return;
       }
 
       const decoded = tokenService.verifyToken(token);
-
+      console.log("Decoded token:", decoded);
       if (!decoded) {
         res.status(403).json({ errorMessage: "Invalid token" });
         return;
