@@ -15,8 +15,19 @@ This project's main focus is the practical application of three essential techni
 - **Node.js Streams** and Server-Sent Events for real-time file processing
 - **Complete Stripe integration** for payment system and subscriptions
 - **Terraform** to automate deployment and manage infrastructure on AWS
+- **CI/CD** for continuous deployment
 
 The development prioritizes learning and experimentation with these technologies, implementing an architecture that demonstrates how to integrate data streaming, secure payments, and Infrastructure as Code (IaC). Some features were developed with an MVP approach to accelerate the learning and prototyping process of the core concepts.
+
+## 📸 Frontend Screenshots
+
+### Homepage
+
+![Homepage](./print-home.png)
+
+### Subscription Page
+
+![Subscription](./print-subscription.png)
 
 ### ✨ Key Features
 
@@ -39,6 +50,7 @@ The development prioritizes learning and experimentation with these technologies
 - **Multer** - File handling
 - **Docker** - Containerization
 - **Terraform** - Infrastructure as code
+- **GitHub Actions** - Continuous integration
 
 ## 🚀 How to Run
 
@@ -179,16 +191,6 @@ npm run dev          # Development
 npm run build        # Production build
 npm run start        # Start production server
 ```
-
-## 📸 Frontend Screenshots
-
-### Homepage
-
-![Homepage](./print-home.png)
-
-### Subscription Page
-
-![Subscription](./print-subscription.png)
 
 ## 🌐 Demo
 
