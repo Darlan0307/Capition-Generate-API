@@ -1,72 +1,58 @@
-# Etapa de build do whisper.cpp
-FROM debian:bullseye-slim AS build
+# 1. Etapa de build do Whisper.cpp
 
-# Instala dependências necessárias
+FROM debian:bullseye-slim AS whisper-build
+
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    git \
-    cmake \
-    ffmpeg \
-    python3 \
-    python3-pip \
-    curl \
-    wget \
+    build-essential git cmake ffmpeg curl wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Clona e compila whisper.cpp
-WORKDIR /app
-RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /app/whisper.cpp
+WORKDIR /src
 
-# Compila o whisper.cpp
-WORKDIR /app/whisper.cpp
+RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git
 
-# Compila usando make (comando padrão)
+WORKDIR /src/whisper.cpp
 RUN make
 
-# Baixa o modelo necessário - usando modelo tiny em vez de base para economizar RAM
+# modelo mais leve em RAM e storage
 RUN bash ./models/download-ggml-model.sh tiny.en
 
-# Verifica quais executáveis foram criados
-# RUN echo "=== Executáveis criados ===" && \
-#     find . -maxdepth 1 -type f -executable | sort && \
-#     echo "=== Conteúdo do diretório ===" && \
-#     ls -la
+# 2. Etapa de build do Node.js (TypeScript + Prisma)
 
-# Etapa final (para rodar Node.js + whisper)
-FROM node:18-slim
-
-# Instala apenas o necessário
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    python3 \
-    && rm -rf /var/lib/apt/lists/*
+FROM node:18-slim AS node-build
 
 WORKDIR /app
 
-# Copia o whisper compilado da etapa anterior
-COPY --from=build /app/whisper.cpp /app/whisper.cpp
-
-# Verifica se os arquivos foram copiados corretamente
-# RUN echo "=== Verificando executáveis após cópia ===" && \
-#     find /app/whisper.cpp/ -name "*whisper*" -o -name "main" -type f -executable | sort && \
-#     echo "=== Verificando modelo ===" && \
-#     ls -la /app/whisper.cpp/models/ggml-tiny.en.bin
-
-# Copia package.json e instala deps (inclui dev deps p/ build)
 COPY package*.json ./
-RUN npm install
 
-# Copia o restante do código
+RUN npm ci
+
 COPY . .
 
-# Compila TypeScript (gera dist/)
-RUN npm run build
+RUN npm run build && npx prisma generate
 
-# Gerando cliente prisma
-RUN npx prisma generate
+# 3. Etapa final - Produção
 
-# Expõe porta
+FROM node:18-slim
+
+
+RUN apt-get update && apt-get install -y ffmpeg python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m appuser
+USER appuser
+
+
+WORKDIR /app
+
+COPY --from=whisper-build /src/whisper.cpp/build/bin/whisper-cli /app/whisper-cli
+COPY --from=whisper-build /src/whisper.cpp/models/ggml-tiny.en.bin /app/models/ggml-tiny.en.bin
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY --from=node-build /app/dist ./dist
+COPY --from=node-build /app/node_modules/.prisma ./node_modules/.prisma
+
 EXPOSE 4000
 
-# CMD ["node", "--expose-gc", "dist/server.js"]
 CMD ["npm", "run", "start"]
