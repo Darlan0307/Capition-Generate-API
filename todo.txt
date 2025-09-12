@@ -1,5 +1,0 @@
-[X] error handling
-[X] adicionar rate limiting
-- adicionar pagamento com o stripe
-
-
