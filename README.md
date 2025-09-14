@@ -54,7 +54,7 @@ The development prioritizes learning and experimentation with these technologies
 - **Terraform** - Infrastructure as code
 - **GitHub Actions** - Continuous integration
 
-## 🚀 How to Run
+## 🚀 How to Run Locally
 
 ### Prerequisites
 
@@ -70,6 +70,8 @@ The development prioritizes learning and experimentation with these technologies
 
 ```bash
 git clone https://github.com/Darlan0307/Capition-Generate-API.git
+
+cd Capition-Generate-API/backend
 ```
 
 2. **Configure environment variables**
@@ -108,16 +110,6 @@ STRIPE_SUBSCRIPTION_PRICE_ID=
 
 ```bash
 docker compose up -d
-```
-
-**OR run locally:**
-
-```bash
-# Install dependencies
-npm install
-
-# Start the server
-npm run dev
 ```
 
 The server will be running at `http://localhost:4000`
@@ -184,14 +176,6 @@ To view the database:
 
 ```bash
 npx prisma studio
-```
-
-## 🔧 Available Scripts
-
-```bash
-npm run dev          # Development
-npm run build        # Production build
-npm run start        # Start production server
 ```
 
 ## 🌐 Demo
