@@ -15,9 +15,11 @@ This project's main focus is the practical application of three essential techni
 - **Node.js Streams** and Server-Sent Events for real-time file processing
 - **Complete Stripe integration** for payment system and subscriptions
 - **Terraform** to automate deployment and manage infrastructure on AWS
-- **CI/CD** for continuous deployment
+- **CI/CD** for continuous deployment (GitHub Actions) on AWS
 
 The development prioritizes learning and experimentation with these technologies, implementing an architecture that demonstrates how to integrate data streaming, secure payments, and Infrastructure as Code (IaC). Some features were developed with an MVP approach to accelerate the learning and prototyping process of the core concepts.
+
+> 💡 Details about the project's infrastructure and deployment (CI/CD) on AWS [at this link](https://github.com/Darlan0307/infra-with-terraform).
 
 ## 📸 Frontend Screenshots
 
@@ -195,7 +197,3 @@ npm run start        # Start production server
 ## 🌐 Demo
 
 https://site-caption-generator.vercel.app/
-
-## 📄 License
-
-This project is under the (MIT) license - see details [here](https://choosealicense.com/licenses/mit/).

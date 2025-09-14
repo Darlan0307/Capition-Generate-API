@@ -15,9 +15,11 @@ Este projeto tem como foco principal a aplicação prática de três conceitos t
 - **Node.js Streams** e Server-Sent Events para processamento de arquivos em tempo real
 - **Integração completa com Stripe** para sistema de pagamentos e assinaturas
 - **Terraform** para automatizar o deploy e gerenciar infraestrutura na AWS
-- **CI/CD** para deploy contínuo
+- **CI/CD** para deploy contínuo (GitHub Actions) na AWS
 
 O desenvolvimento prioriza o aprendizado e experimentação dessas tecnologias, implementando uma arquitetura que demonstra como integrar streaming de dados, pagamentos seguros e Infrastructure as Code (IaC). Algumas funcionalidades foram desenvolvidas com abordagem MVP para acelerar o processo de aprendizado e prototipação dos conceitos core.
+
+> 💡 Detalhes sobre a infraestrutura e deploy (CI/CD) do projeto na AWS [neste link](https://github.com/Darlan0307/infra-with-terraform).
 
 ## 📸 Screenshots do frontend
 
@@ -52,7 +54,7 @@ O desenvolvimento prioriza o aprendizado e experimentação dessas tecnologias, 
 - **Terraform** - Infraestrutura como código
 - **GitHub Actions** - Integração contínua
 
-## 🚀 Como Executar
+## 🚀 Como Executar Localmente
 
 ### Pré-requisitos
 
@@ -68,6 +70,8 @@ O desenvolvimento prioriza o aprendizado e experimentação dessas tecnologias, 
 
 ```bash
 git clone https://github.com/Darlan0307/Capition-Generate-API.git
+
+cd Capition-Generate-API/backend
 ```
 
 2. **Configure as variáveis de ambiente**
@@ -106,16 +110,6 @@ STRIPE_SUBSCRIPTION_PRICE_ID=
 
 ```bash
 docker compose up -d
-```
-
-**OU execute localmente:**
-
-```bash
-# Instalar dependências
-npm install
-
-# Iniciar o servidor
-npm run dev
 ```
 
 O servidor estará rodando em `http://localhost:4000`
@@ -184,18 +178,6 @@ Para visualizar o banco:
 npx prisma studio
 ```
 
-## 🔧 Scripts Disponíveis
-
-```bash
-npm run dev          # Desenvolvimento
-npm run build        # Build para produção
-npm run start        # Inicia servidor de produção
-```
-
 ## 🌐 Demonstração
 
 https://site-caption-generator.vercel.app/
-
-## 📄 Licença
-
-Esse projeto está sob a licença (MIT) - acesse os detalhes [aqui](https://choosealicense.com/licenses/mit/).
