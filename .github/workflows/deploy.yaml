@@ -1,0 +1,68 @@
+name: Pipeline CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  job1:
+    name: build_ecr
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4.3.1
+        with:
+          role-to-assume: ${{ secrets.ROLE_ARN_APP }}
+          aws-region: us-east-1
+
+      - name: Amazon ECR "Login" Action for GitHub Actions
+        uses: aws-actions/amazon-ecr-login@v2.0.1
+
+      - name: Build, Tag, and Push image to Amazon ECR
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          ECR_NAME: ${{ secrets.ECR_NAME }}
+        # TODO: melhorar a parte da tag
+        run: |
+          docker build -t api-caption-generator:v1.0 .
+          docker tag api-caption-generator:v1.0 $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/$ECR_NAME:v1.0
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/$ECR_NAME:v1.0
+
+  job2:
+    name: deploy_ec2
+    needs: job1
+    env:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_NAME: ${{ secrets.ECR_NAME }}
+      INSTANCE_KEY: ${{secrets.INSTANCE_KEY}}
+      PUBLIC_IP: ${{secrets.PUBLIC_IP}}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy EC2 SSH
+        run: |
+          echo "$INSTANCE_KEY" > chave-site.pem
+          chmod 400 chave-site.pem
+          ssh -i chave-site.pem -o StrictHostKeyChecking=no ec2-user@$PUBLIC_IP << EOF
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
+            docker pull $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/$ECR_NAME:v1.0
+            echo "parando container antigo site"
+            docker stop service || true
+            echo "removendo container antigo site"
+            docker rm service || true
+            echo "rodando nova tag da imagem"
+            docker run -d -p 80:4000 --name service $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/$ECR_NAME:v1.0
+            echo "Parabéns! Imagem foi atualizada!"
+            docker ps
+          EOF
+          rm chave-site.pem
