@@ -19,7 +19,20 @@ This project's main focus is the practical application of three essential techni
 
 The development prioritizes learning and experimentation with these technologies, implementing an architecture that demonstrates how to integrate data streaming, secure payments, and Infrastructure as Code (IaC). Some features were developed with an MVP approach to accelerate the learning and prototyping process of the core concepts.
 
+## 🤖 Pipeline Description
+
 > 💡 Details about the project's infrastructure and deployment (CI/CD) on AWS [at this link](https://github.com/Darlan0307/infra-with-terraform).
+
+This project implements a **CI/CD pipeline** using **GitHub Actions** to automate the entire build and deployment process of the application.  
+The workflow works as follows:
+
+1. On every **push to the main branch**, the pipeline is triggered.
+2. The application is **built into a Docker image** and pushed to **Amazon Elastic Container Registry (ECR)**.
+3. After that, the pipeline connects to an **Amazon EC2 instance** via SSH.
+4. The latest image is **pulled from ECR**, and the old container is stopped and removed.
+5. A new container is started with the **updated version of the application**.
+
+This makes the deployment process **automated, secure, and reproducible**.
 
 ## 📸 Frontend Screenshots
 

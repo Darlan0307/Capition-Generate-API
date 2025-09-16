@@ -19,7 +19,20 @@ Este projeto tem como foco principal a aplicação prática de três conceitos t
 
 O desenvolvimento prioriza o aprendizado e experimentação dessas tecnologias, implementando uma arquitetura que demonstra como integrar streaming de dados, pagamentos seguros e Infrastructure as Code (IaC). Algumas funcionalidades foram desenvolvidas com abordagem MVP para acelerar o processo de aprendizado e prototipação dos conceitos core.
 
+## 🤖 Descrição da Pipeline
+
 > 💡 Detalhes sobre a infraestrutura e deploy (CI/CD) do projeto na AWS [neste link](https://github.com/Darlan0307/infra-with-terraform).
+
+Este projeto implementa uma **pipeline de CI/CD** utilizando o **GitHub Actions** para automatizar todo o processo de build e deploy da aplicação.  
+O fluxo funciona da seguinte forma:
+
+1. Ao realizar um **push na branch main**, a pipeline é disparada.
+2. A aplicação é **buildada em uma imagem Docker** e enviada para o **Amazon Elastic Container Registry (ECR)**.
+3. Após o envio, a pipeline se conecta a uma instância **Amazon EC2** via SSH.
+4. A imagem mais recente é **baixada da ECR** e o container antigo é parado e removido.
+5. Um novo container é iniciado com a **versão atualizada da aplicação**.
+
+Dessa forma, o processo de deploy se torna **automatizado, seguro e replicável**.
 
 ## 📸 Screenshots do frontend
 
