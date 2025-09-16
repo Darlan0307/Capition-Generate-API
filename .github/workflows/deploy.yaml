@@ -35,7 +35,7 @@ jobs:
           ECR_NAME: ${{ secrets.ECR_NAME }}
         # TODO: melhorar a parte da tag
         run: |
-          docker build -t api-caption-generator:v1.0 .
+          docker build -t api-caption-generator:v1.0 backend
           docker tag api-caption-generator:v1.0 $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/$ECR_NAME:v1.0
           docker push $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/$ECR_NAME:v1.0
 
