@@ -48,7 +48,7 @@ jobs:
     steps:
       - name: Deploy EC2 SSH
         run: |
-          echo "$INSTANCE_KEY" > chave-site.pem
+          echo "${{ secrets.INSTANCE_KEY }}" | tr -d '\r' > chave-site.pem
           chmod 400 chave-site.pem
           ssh -i chave-site.pem -o StrictHostKeyChecking=no ec2-user@$PUBLIC_IP << EOF
             aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
